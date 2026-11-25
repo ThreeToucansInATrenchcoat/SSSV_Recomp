@@ -8,7 +8,6 @@
 - Added Menu Inputs to keyboard bindings. Default secondary bindings: right click for Back and left click for Apply.
 - Game menus and pause use menu bindings before gameplay bindings, falling back to normal controls when a menu action is unbound. Keyboard, mouse and controller follow the same rule.
 - A and B advance past the title screen's Press Start prompt. A or the menu Apply binding (left click by default) skips startup logos and the new-game intro, preserving the intro's fade and dog-reveal transition.
-- Preserved the Build 6 Linux startup, audio, compiler and frame-pacing fixes and its intro-skip audio/briefing improvements.
 - Removed Herobrine.
 
 ## Build 6 — 7 November 2026
