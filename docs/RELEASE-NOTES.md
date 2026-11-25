@@ -1,13 +1,4 @@
-# Build 7
+# Build 7.1
 
-- Fixed stale Take-Two logo pixels around the edges in Original aspect mode.
-- Enabled the extended intro glass pattern in Original mode as well as Expand mode.
-- Added assignable mouse buttons to keyboard bindings. B defaults to Left Shift first and left click second.
-- Added Menu Inputs to keyboard bindings. Default secondary bindings: right click for Back and left click for Apply.
-- Game menus and pause use menu bindings before gameplay bindings, falling back to normal controls when a menu action is unbound. Keyboard, mouse and controller follow the same rule.
-- A and B advance past the title screen's Press Start prompt. A or the menu Apply binding (left click by default) skips startup logos and the new-game intro, preserving the intro's fade and dog-reveal transition.
-- Removed Herobrine.
-
-Includes Windows x64 and Linux x64 packages, the optional texture pack, licenses, source and SHA-256 checksums. No ROM or saves are included.
-
-HD World Textures remain incomplete.
+- I am very dumb - this was based on someone elses port and I got 'menu' items confused for the ingame menu, when it was really the friggin escape menu.
+- Herobrine Added

@@ -1,5 +1,10 @@
 # Changelog
 
+## Build 7.1 — 25 November 2026
+
+- I am very dumb - this was based on someone elses port and I got 'menu' items confused for the ingame menu, when it was really the friggin escape menu.
+- Herobrine Added
+
 ## Build 7 — 25 November 2026
 
 - Fixed stale Take-Two logo pixels around the edges in Original aspect mode.
