@@ -41,7 +41,9 @@ RECOMP_EXPORT void sssv_extend_intro_glass(void) {
     s32 frame = (u32)(uintptr_t)gDisplayListContext == 0x80162B38u ? 0 : 1;
     s32 plane, cursor = 0;
     f32 aspect = recomp_get_target_aspect_ratio(4.0f / 3.0f);
-    if (gGameState.level != 1 || aspect <= 4.0f / 3.0f || count <= 0 || count > 32) return;
+    // Original mode also exposes the edge of the authored grid as the camera
+    // rolls. Cover its 4:3 frustum with the same decorative repeats.
+    if (gGameState.level != 1 || count <= 0 || count > 32) return;
     for (plane = 0; plane < 2; ++plane) {
         s32 i, found = -1;
         f32 cx = plane ? 3040.0f : 2999.0f;

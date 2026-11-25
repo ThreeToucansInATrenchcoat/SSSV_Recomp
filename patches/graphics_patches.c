@@ -544,6 +544,11 @@ RECOMP_PATCH void func_802B3EC0_6C5570(Gfx** dl, s16 mode, f32 arg2, f32 arg3, f
 
     if ((gGameState.level == 36) && (gCameraVisibilityMask[0] == 0x80)) {
         draw_rectangle(dl, 0, 0, SSSV_BASE_WIDTH, SSSV_BASE_HEIGHT, 255, 255, 255, 255);
+    } else if ((gGameState.level == 36) && (gCameraVisibilityMask[0] == 0x8F) && (mode == 2)) {
+        // The moving Take-Two model can draw outside the TV-safe inset.
+        // Clear those pixels too: Original mode otherwise retains strips of
+        // earlier, larger logo frames around the inset black rectangle.
+        draw_rectangle(dl, 0, 0, SSSV_BASE_WIDTH, SSSV_BASE_HEIGHT, 0, 0, 0, 255);
     } else if (mode == 0) {
         draw_rectangle(dl, 0, 0, SSSV_BASE_WIDTH, SSSV_BASE_HEIGHT, 0, 0, 0, 255);
         func_802B4148_6C57F8(dl);

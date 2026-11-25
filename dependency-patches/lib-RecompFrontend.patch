@@ -12,20 +12,145 @@ index f5ed6c078000851abbabafa6e1581160c3bf6cca..6a7a082e5acf6671961001d5970512ae
  
      #define DEFINE_INPUT(name, value, readable) name,
      // - Enum containing every recomp input.
+diff --git a/recompinput/include/recompinput/menu_input_policy.h b/recompinput/include/recompinput/menu_input_policy.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..061339272b4ed7813ae74dd9bea204f3769301f7
+--- /dev/null
++++ b/recompinput/include/recompinput/menu_input_policy.h
+@@ -0,0 +1,27 @@
++#pragma once
++#include "input_types.h"
++#include <utility>
++namespace recompinput {
++inline constexpr std::pair<GameInput, GameInput> game_menu_actions[] = {
++    {GameInput::ACCEPT_MENU, GameInput::A}, {GameInput::BACK_MENU, GameInput::B},
++    {GameInput::APPLY_MENU, GameInput::START}, {GameInput::TAB_LEFT_MENU, GameInput::L},
++    {GameInput::TAB_RIGHT_MENU, GameInput::R}
++};
++template<class Mappings> bool menu_assigned(const Mappings& mappings, GameInput input) {
++    for (const auto& f : mappings[(size_t)input]) if (!f.is_empty()) return true;
++    return false;
++}
++template<class Mappings> bool menu_reserved(const Mappings& mappings, const InputField& field) {
++    for (auto [action, game] : game_menu_actions)
++        for (const auto& f : mappings[(size_t)action]) if (!f.is_empty() && f == field) return true;
++    return false;
++}
++template<class Mappings, class Read> bool menu_button_down(const Mappings& mappings, GameInput game, bool menu, Read read) {
++    GameInput action = GameInput::COUNT;
++    if (menu) for (auto [candidate, target] : game_menu_actions)
++        if (target == game && menu_assigned(mappings, candidate)) action = candidate;
++    for (const auto& field : mappings[(size_t)(action == GameInput::COUNT ? game : action)])
++        if ((!menu || action != GameInput::COUNT || !menu_reserved(mappings, field)) && read(field)) return true;
++    return false;
++}
++}
+diff --git a/recompinput/include/recompinput/profiles.h b/recompinput/include/recompinput/profiles.h
+index 45bedd1aa986480683c3bab959e82626a8a4569c..f1e96302002475dbdd0625af7ba7d758dc99d150 100644
+--- a/recompinput/include/recompinput/profiles.h
++++ b/recompinput/include/recompinput/profiles.h
+@@ -62,6 +62,8 @@ namespace recompinput {
+         int get_or_create_mp_keyboard_profile_index(int player_index);
+         std::string get_string_from_controller_guid(ControllerGUID guid);
+         bool get_n64_input(int player_index, uint16_t* buttons_out, float* x_out, float* y_out);
++        bool get_n64_input_impl(int player_index, uint16_t* buttons_out, float* x_out, float* y_out, bool menu);
++        bool get_n64_menu_input(int player_index, uint16_t* buttons_out, float* x_out, float* y_out);
+ 
+         bool load_controls_config(const std::filesystem::path& path);
+         bool save_controls_config(const std::filesystem::path& path);
+diff --git a/recompinput/src/input_events.cpp b/recompinput/src/input_events.cpp
+index c76a1dcb4f8a26af4a0cb1f82734141d3101d4bb..5a0f1fb9ec532a86a9e72e1f0fedb189d0913c11 100644
+--- a/recompinput/src/input_events.cpp
++++ b/recompinput/src/input_events.cpp
+@@ -70,6 +70,15 @@ bool sdl_event_filter(void* userdata, SDL_Event* event) {
+         }
+     }
+     break;
++    case SDL_EventType::SDL_MOUSEBUTTONDOWN:
++        if (binding::is_binding()) {
++            if (binding::get_scanning_device() == InputDevice::Keyboard) {
++                binding::set_scanned_input({ InputType::Mouse, event->button.button });
++            }
++        } else {
++            queue_if_enabled(event);
++        }
++        break;
+     case SDL_EventType::SDL_CONTROLLERDEVICEADDED:
+     {
+         SDL_ControllerDeviceEvent* controller_event = &event->cdevice;
 diff --git a/recompinput/src/input_mapping.cpp b/recompinput/src/input_mapping.cpp
-index bfcfef452cd56026175c971d03b7f34b57963671..843b494fbb2fc453dc8e07439a6984caf8deb8b9 100644
+index bfcfef452cd56026175c971d03b7f34b57963671..9706df573f6cba2d7583412b7b8d5a1774c1ef72 100644
 --- a/recompinput/src/input_mapping.cpp
 +++ b/recompinput/src/input_mapping.cpp
-@@ -26,6 +26,7 @@ namespace recompinput {
+@@ -7,9 +7,8 @@ namespace recompinput {
+ 
+     default_game_input_device_mapping default_n64_mappings_keyboard = {
+         { GameInput::A,              { InputField::keyboard(SDL_SCANCODE_SPACE) } },
+-        { GameInput::B,              { InputField::keyboard(SDL_SCANCODE_LSHIFT) } },
++        { GameInput::B,              { InputField::keyboard(SDL_SCANCODE_LSHIFT), { InputType::Mouse, SDL_BUTTON_LEFT } } },
+         { GameInput::L,              { InputField::keyboard(SDL_SCANCODE_E) } },
+-        { GameInput::B,              { InputField::keyboard(SDL_SCANCODE_LSHIFT) } },
+         { GameInput::R,              { InputField::keyboard(SDL_SCANCODE_R) } },
+         { GameInput::Z,              { InputField::keyboard(SDL_SCANCODE_Q) } },
+         { GameInput::START,          { InputField::keyboard(SDL_SCANCODE_RETURN) } },
+@@ -26,10 +25,11 @@ namespace recompinput {
          { GameInput::Y_AXIS_POS,     { InputField::keyboard(SDL_SCANCODE_W) } },
          { GameInput::Y_AXIS_NEG,     { InputField::keyboard(SDL_SCANCODE_S) } },
  
 +        { GameInput::FAST_FORWARD,   { InputField::keyboard(SDL_SCANCODE_TAB) } },
          { GameInput::TOGGLE_MENU,    { InputField::keyboard(SDL_SCANCODE_ESCAPE) } },
          { GameInput::ACCEPT_MENU,    { InputField::keyboard(SDL_SCANCODE_RETURN) } },
-         { GameInput::BACK_MENU,      { InputField::keyboard(SDL_SCANCODE_F15) } },
+-        { GameInput::BACK_MENU,      { InputField::keyboard(SDL_SCANCODE_F15) } },
+-        { GameInput::APPLY_MENU,     { InputField::keyboard(SDL_SCANCODE_F) } },
++        { GameInput::BACK_MENU,      { InputField::keyboard(SDL_SCANCODE_F15), { InputType::Mouse, SDL_BUTTON_RIGHT } } },
++        { GameInput::APPLY_MENU,     { InputField::keyboard(SDL_SCANCODE_F), { InputType::Mouse, SDL_BUTTON_LEFT } } },
+         { GameInput::TAB_LEFT_MENU,  { InputField::keyboard(SDL_SCANCODE_F16) } },
+         { GameInput::TAB_RIGHT_MENU, { InputField::keyboard(SDL_SCANCODE_F17) } }
+     };
+diff --git a/recompinput/src/input_state.cpp b/recompinput/src/input_state.cpp
+index 03ed871a60e679e754adaa0bf7a4f281485f4190..802487abc6af989abe3e2ce14c460e406f569a2b 100644
+--- a/recompinput/src/input_state.cpp
++++ b/recompinput/src/input_state.cpp
+@@ -18,6 +18,7 @@ static struct {
+     const Uint8* keys = nullptr;
+     SDL_Keymod keymod = SDL_Keymod::KMOD_NONE;
+     int numkeys = 0;
++    Uint32 mouse_buttons = 0;
+     std::atomic_int32_t mouse_wheel_pos = 0;
+     std::mutex controllers_mutex;
+     std::vector<SDL_GameController*> detected_controllers{};
+@@ -34,6 +35,7 @@ static struct {
+ void recompinput::poll_inputs() {
+     InputState.keys = SDL_GetKeyboardState(&InputState.numkeys);
+     InputState.keymod = SDL_GetModState();
++    InputState.mouse_buttons = SDL_GetMouseFocus() ? SDL_GetMouseState(nullptr, nullptr) : 0;
+     static bool first_poll = true;
+ 
+     {
+@@ -230,8 +232,8 @@ float recompinput::get_input_analog(int controller_num, const InputField& field)
+     case InputType::ControllerAnalog:
+         return controller_axis_state(controller_num, field.input_id, true);
+     case InputType::Mouse:
+-        // TODO mouse support
+-        return 0.0f;
++        return (field.input_id > 0 && field.input_id <= 32 &&
++            (InputState.mouse_buttons & SDL_BUTTON(field.input_id))) ? 1.0f : 0.0f;
+     case InputType::None:
+         return false;
+     }
+@@ -261,8 +263,8 @@ bool recompinput::get_input_digital(int controller_num, const InputField& field)
+         // TODO adjustable threshold
+         return controller_axis_state(controller_num, field.input_id, true) >= recompinput::axis_digital_threshold;
+     case InputType::Mouse:
+-        // TODO mouse support
+-        return false;
++        return field.input_id > 0 && field.input_id <= 32 &&
++            (InputState.mouse_buttons & SDL_BUTTON(field.input_id)) != 0;
+     case InputType::None:
+         return false;
+     }
 diff --git a/recompinput/src/input_types.cpp b/recompinput/src/input_types.cpp
-index c6786e64047050a062ab95812ad4a23292ee1cc8..177877e454396d089600656fa12c76278f915415 100644
+index c6786e64047050a062ab95812ad4a23292ee1cc8..774ca1335068c4f9a113a89e1a665cb5bd167da4 100644
 --- a/recompinput/src/input_types.cpp
 +++ b/recompinput/src/input_types.cpp
 @@ -17,6 +17,7 @@ constexpr std::array<std::string, num_game_inputs> get_default_game_input_descri
@@ -36,6 +161,88 @@ index c6786e64047050a062ab95812ad4a23292ee1cc8..177877e454396d089600656fa12c7627
      descriptions[static_cast<size_t>(GameInput::TOGGLE_MENU)] = "Open or close this configuration menu from in game.";
      descriptions[static_cast<size_t>(GameInput::ACCEPT_MENU)] = "In the recomp interface, performs the action for the currently highlighted item. Like pressing a button, or toggling a switch.";
      descriptions[static_cast<size_t>(GameInput::BACK_MENU)] = "In the recomp interface, returns to the header or backs out to a previous menu.";
+@@ -260,6 +261,15 @@ std::string recompinput::InputField::to_string() const {
+         return controller_axis_to_string(input_id);
+     case InputType::Keyboard:
+         return keyboard_input_to_string((SDL_Scancode)input_id);
++    case InputType::Mouse:
++        switch (input_id) {
++        case SDL_BUTTON_LEFT: return "Mouse Left";
++        case SDL_BUTTON_RIGHT: return "Mouse Right";
++        case SDL_BUTTON_MIDDLE: return "Mouse Middle";
++        case SDL_BUTTON_X1: return "Mouse X1";
++        case SDL_BUTTON_X2: return "Mouse X2";
++        default: return "Mouse " + std::to_string(input_id);
++        }
+     default:
+         return recompinput::unknown_device_input;
+     }
+diff --git a/recompinput/src/profiles.cpp b/recompinput/src/profiles.cpp
+index c89956e6d8e5daa3d02fa8f11ac64504c46b0105..2409478d75e39e0dcd2997de5b8f1420c3a97011 100644
+--- a/recompinput/src/profiles.cpp
++++ b/recompinput/src/profiles.cpp
+@@ -1,3 +1,4 @@
++#include "recompinput/menu_input_policy.h"
+ #include <filesystem>
+ #include <fstream>
+ #include <iomanip>
+@@ -371,7 +372,7 @@ namespace recompinput {
+         return "SERIAL_" + guid.serial + "_VID_" + std::to_string(guid.vendor) + "_PID_" + std::to_string(guid.product) +"_VERSION_" + std::to_string(guid.version) +"_CRC16_" + std::to_string(guid.crc16);
+     }
+ 
+-    bool profiles::get_n64_input(int player_index, uint16_t* buttons_out, float* x_out, float* y_out) {
++    bool profiles::get_n64_input_impl(int player_index, uint16_t* buttons_out, float* x_out, float* y_out, bool menu) {
+         uint16_t cur_buttons = 0;
+         float cur_x = 0.0f;
+         float cur_y = 0.0f;
+@@ -382,8 +383,13 @@ namespace recompinput {
+                 }
+ 
+                 const input_mapping_array &mappings = input_profiles[profile_index].mappings;
++                // Menu bindings replace their corresponding game action. A source
++                // assigned to any menu action cannot also trigger a game action.
+                 for (size_t i = 0; i < n64_button_values.size(); i++) {
+-                    cur_buttons |= recompinput::get_input_digital(player_index, mappings[(size_t)(GameInput::N64_BUTTON_START) + i]) ? n64_button_values[i] : 0;
++                    GameInput game = static_cast<GameInput>((size_t)GameInput::N64_BUTTON_START + i);
++                    const bool down = menu_button_down(mappings, game, menu,
++                        [&](const InputField& field) { return recompinput::get_input_digital(player_index, field); });
++                    if (down) cur_buttons |= n64_button_values[i];
+                 }
+             };
+ 
+@@ -393,8 +399,15 @@ namespace recompinput {
+                 }
+ 
+                 const input_mapping_array &mappings = input_profiles[profile_index].mappings;
+-                cur_x += recompinput::get_input_analog(player_index, mappings[(size_t)GameInput::X_AXIS_POS]) - recompinput::get_input_analog(player_index, mappings[(size_t)GameInput::X_AXIS_NEG]);
+-                cur_y += recompinput::get_input_analog(player_index, mappings[(size_t)GameInput::Y_AXIS_POS]) - recompinput::get_input_analog(player_index, mappings[(size_t)GameInput::Y_AXIS_NEG]);
++                auto analog = [&](GameInput input) {
++                    float value = 0.0f;
++                    for (const auto& field : mappings[(size_t)input])
++                        if (!menu || !menu_reserved(mappings, field))
++                            value += recompinput::get_input_analog(player_index, field);
++                    return std::clamp(value, 0.0f, 1.0f);
++                };
++                cur_x += analog(GameInput::X_AXIS_POS) - analog(GameInput::X_AXIS_NEG);
++                cur_y += analog(GameInput::Y_AXIS_POS) - analog(GameInput::Y_AXIS_NEG);
+             };
+             
+             int profile_index_cont = players::is_single_player_mode() ? profiles::get_sp_controller_profile_index() : players_input_profile_indices[player_index].first;
+@@ -414,6 +427,14 @@ namespace recompinput {
+         return true;
+     }
+ 
++    bool profiles::get_n64_input(int player, uint16_t* buttons, float* x, float* y) {
++        return get_n64_input_impl(player, buttons, x, y, false);
++    }
++
++    bool profiles::get_n64_menu_input(int player, uint16_t* buttons, float* x, float* y) {
++        return get_n64_input_impl(player, buttons, x, y, true);
++    }
++
+     static void add_input_bindings(json& out, int profile_index, GameInput input) {
+         const std::string& input_name = recompinput::get_game_input_enum_name(input);
+         json& out_array = out[input_name];
 diff --git a/recompui/include/recompui/config.h b/recompui/include/recompui/config.h
 index 38b84f569d4454477cd6247bc7a8c170ecc9851b..1c08ae94354dbbc56a28fc4cd327cbe8f1444d41 100644
 --- a/recompui/include/recompui/config.h
@@ -145,6 +352,24 @@ index 6c84c0531464f211705d094afabbf7414b6ac504..31774e1f9c41f3cad713be8053e48fcd
      recomp::config::Config &config::get_config(const std::string &id) {
          for (auto &[config_id, config] : configs) {
              if (config_id == id) {
+diff --git a/recompui/src/config/ui_config_page_controls.cpp b/recompui/src/config/ui_config_page_controls.cpp
+index f379a6f11c942e0e44c9f22b686aeed9edce3b8a..29463f598d57fc147ed51db16bd3713fff3b022c 100644
+--- a/recompui/src/config/ui_config_page_controls.cpp
++++ b/recompui/src/config/ui_config_page_controls.cpp
+@@ -581,12 +581,7 @@ void ConfigPageControls::update_control_mappings() {
+         wrapper->set_margin_top(0.0f);
+         wrapper->set_margin_bottom(0.0f);
+         if (wrapper->is_menu) {
+-            if (get_player_input_device() == recompinput::InputDevice::Keyboard) {
+-                wrapper->display_hide();
+-            } else {
+-                wrapper->display_show();
+-            }
+-            break;
++            wrapper->display_show();
+         }
+     }
+ 
 diff --git a/recompui/src/config/ui_config_page_options_menu.cpp b/recompui/src/config/ui_config_page_options_menu.cpp
 index 6ba64e2a349cc9b5732d6e61e7d4824d4e496867..c9c0a16868440a7f9ba70164b35d9743777efca0 100644
 --- a/recompui/src/config/ui_config_page_options_menu.cpp

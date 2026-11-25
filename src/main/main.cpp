@@ -49,6 +49,7 @@
 extern std::atomic<uint32_t> sssv_simulation_speed;
 #include "gbi/sssv_mirror.h"
 #include "sssv_mirror_input.h"
+#include "sssv_menu_input.h"
 #include "sssv_game.h"
 #include "sssv_launcher.h"
 #include "theme.h"
@@ -1373,7 +1374,20 @@ int main(int argc, char** argv) {
     ultramodern::input::callbacks_t input_callbacks{
         .poll_input = recompinput::poll_inputs,
         .get_input = [](int controller, uint16_t* buttons, float* x, float* y) {
-            const bool result = input_movie.get(controller, buttons, x, y, recompinput::profiles::get_n64_input);
+            const auto memory = sssv::mirror::gameMemory.load(std::memory_order_relaxed);
+            const bool startup = sssv::menu::startup(memory) || sssv::menu::new_game_intro(memory);
+            const auto read_input = (sssv::menu::active(memory) || startup)
+                ? recompinput::profiles::get_n64_menu_input : recompinput::profiles::get_n64_input;
+            const bool result = input_movie.get(controller, buttons, x, y, read_input);
+            if (result && startup) {
+                // Startup also accepts the regular A button, even when a menu
+                // Accept override replaces A in the ordinary game menus.
+                uint16_t normal_buttons = 0; float normal_x = 0, normal_y = 0;
+                recompinput::profiles::get_n64_input(controller, &normal_buttons, &normal_x, &normal_y);
+                *buttons |= normal_buttons & 0x8000;
+                sssv::menu::skip_startup(*buttons);
+            }
+            if (result && sssv::menu::title(memory)) sssv::menu::advance_title(*buttons);
             if (result && RT64::SSSVMirror::enabled.load(std::memory_order_relaxed) &&
                 sssv::mirror::gameplay_input(sssv::mirror::gameMemory.load(std::memory_order_relaxed))) {
                 sssv::mirror::reflect_input(*buttons, *x);
