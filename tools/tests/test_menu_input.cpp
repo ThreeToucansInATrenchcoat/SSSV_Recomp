@@ -12,13 +12,25 @@ int main() {
   mappings[(size_t)GameInput::A]={normalA}; mappings[(size_t)GameInput::B]={click};
   auto read=[&](const InputField& f){return f==click;};
   assert(menu_button_down(mappings,GameInput::B,true,read));
-  mappings[(size_t)GameInput::ACCEPT_MENU]={click};
+  mappings[(size_t)GameInput::ACCEPT_MENU]={click}; // Escape UI bindings never override game controls.
+  assert(menu_button_down(mappings,GameInput::B,true,read));
+  assert(!menu_button_down(mappings,GameInput::A,true,read));
+  mappings[(size_t)GameInput::ACCEPT_INGAME_MENU]={click};
   assert(menu_button_down(mappings,GameInput::A,true,read));
   assert(!menu_button_down(mappings,GameInput::B,true,read));
   assert(menu_button_down(mappings,GameInput::B,false,read));
   assert(!menu_button_down(mappings,GameInput::A,false,read));
-  mappings[(size_t)GameInput::ACCEPT_MENU].clear();
+  mappings[(size_t)GameInput::ACCEPT_INGAME_MENU].clear();
   assert(menu_button_down(mappings,GameInput::A,true,[&](const InputField& f){return f==normalA;}));
+  mappings[(size_t)GameInput::BACK_INGAME_MENU]={normalA};
+  assert(menu_button_down(mappings,GameInput::B,true,[&](const InputField& f){return f==normalA;}));
+  assert(!menu_button_down(mappings,GameInput::A,true,[&](const InputField& f){return f==normalA;}));
+  assert(!menu_button_down(mappings,GameInput::B,true,read));
+  // Escape-only Apply and tab assignments must not steal game inputs.
+  mappings[(size_t)GameInput::APPLY_MENU]={click};
+  mappings[(size_t)GameInput::START]={click};
+  assert(menu_button_down(mappings,GameInput::START,true,read));
+
  }
  std::vector<uint8_t> memory(0x800000);
  auto byte=[&](uint32_t a,uint8_t v){memory[(a&0x7fffff)^3]=v;};

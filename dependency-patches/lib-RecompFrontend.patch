@@ -1,31 +1,32 @@
 diff --git a/recompinput/include/recompinput/input_types.h b/recompinput/include/recompinput/input_types.h
-index f5ed6c078000851abbabafa6e1581160c3bf6cca..6a7a082e5acf6671961001d5970512ae04aaf212 100644
+index f5ed6c078000851abbabafa6e1581160c3bf6cca..c1c20ddc56704e6b0e2859a643c88275e8a1af07 100644
 --- a/recompinput/include/recompinput/input_types.h
 +++ b/recompinput/include/recompinput/input_types.h
-@@ -40,7 +40,8 @@ namespace recompinput {
+@@ -40,7 +40,10 @@ namespace recompinput {
      #define DEFINE_ALL_INPUTS() \
          DEFINE_N64_AXIS_INPUTS() \
          DEFINE_N64_BUTTON_INPUTS() \
 -        DEFINE_RECOMP_UI_INPUTS()
 +        DEFINE_RECOMP_UI_INPUTS() \
-+        DEFINE_INPUT(FAST_FORWARD, 0, "Fast Forward")
++        DEFINE_INPUT(FAST_FORWARD, 0, "Fast Forward") \
++        DEFINE_INPUT(ACCEPT_INGAME_MENU, 0, "Accept") \
++        DEFINE_INPUT(BACK_INGAME_MENU, 0, "Back")
  
      #define DEFINE_INPUT(name, value, readable) name,
      // - Enum containing every recomp input.
 diff --git a/recompinput/include/recompinput/menu_input_policy.h b/recompinput/include/recompinput/menu_input_policy.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..061339272b4ed7813ae74dd9bea204f3769301f7
+index 0000000000000000000000000000000000000000..7553b3976ee0b6198b68b79221ff37e104a8b21e
 --- /dev/null
 +++ b/recompinput/include/recompinput/menu_input_policy.h
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,26 @@
 +#pragma once
 +#include "input_types.h"
 +#include <utility>
 +namespace recompinput {
 +inline constexpr std::pair<GameInput, GameInput> game_menu_actions[] = {
-+    {GameInput::ACCEPT_MENU, GameInput::A}, {GameInput::BACK_MENU, GameInput::B},
-+    {GameInput::APPLY_MENU, GameInput::START}, {GameInput::TAB_LEFT_MENU, GameInput::L},
-+    {GameInput::TAB_RIGHT_MENU, GameInput::R}
++    {GameInput::ACCEPT_INGAME_MENU, GameInput::A},
++    {GameInput::BACK_INGAME_MENU, GameInput::B}
 +};
 +template<class Mappings> bool menu_assigned(const Mappings& mappings, GameInput input) {
 +    for (const auto& f : mappings[(size_t)input]) if (!f.is_empty()) return true;
@@ -79,7 +80,7 @@ index c76a1dcb4f8a26af4a0cb1f82734141d3101d4bb..5a0f1fb9ec532a86a9e72e1f0fedb189
      {
          SDL_ControllerDeviceEvent* controller_event = &event->cdevice;
 diff --git a/recompinput/src/input_mapping.cpp b/recompinput/src/input_mapping.cpp
-index bfcfef452cd56026175c971d03b7f34b57963671..9706df573f6cba2d7583412b7b8d5a1774c1ef72 100644
+index bfcfef452cd56026175c971d03b7f34b57963671..8ac69283f6231db374fc5c1417de744f970d5ebc 100644
 --- a/recompinput/src/input_mapping.cpp
 +++ b/recompinput/src/input_mapping.cpp
 @@ -7,9 +7,8 @@ namespace recompinput {
@@ -93,10 +94,12 @@ index bfcfef452cd56026175c971d03b7f34b57963671..9706df573f6cba2d7583412b7b8d5a17
          { GameInput::R,              { InputField::keyboard(SDL_SCANCODE_R) } },
          { GameInput::Z,              { InputField::keyboard(SDL_SCANCODE_Q) } },
          { GameInput::START,          { InputField::keyboard(SDL_SCANCODE_RETURN) } },
-@@ -26,10 +25,11 @@ namespace recompinput {
+@@ -26,15 +25,20 @@ namespace recompinput {
          { GameInput::Y_AXIS_POS,     { InputField::keyboard(SDL_SCANCODE_W) } },
          { GameInput::Y_AXIS_NEG,     { InputField::keyboard(SDL_SCANCODE_S) } },
  
++        { GameInput::ACCEPT_INGAME_MENU, { InputField::keyboard(SDL_SCANCODE_SPACE), { InputType::Mouse, SDL_BUTTON_LEFT } } },
++        { GameInput::BACK_INGAME_MENU, { InputField::keyboard(SDL_SCANCODE_LSHIFT), { InputType::Mouse, SDL_BUTTON_RIGHT } } },
 +        { GameInput::FAST_FORWARD,   { InputField::keyboard(SDL_SCANCODE_TAB) } },
          { GameInput::TOGGLE_MENU,    { InputField::keyboard(SDL_SCANCODE_ESCAPE) } },
          { GameInput::ACCEPT_MENU,    { InputField::keyboard(SDL_SCANCODE_RETURN) } },
@@ -107,6 +110,13 @@ index bfcfef452cd56026175c971d03b7f34b57963671..9706df573f6cba2d7583412b7b8d5a17
          { GameInput::TAB_LEFT_MENU,  { InputField::keyboard(SDL_SCANCODE_F16) } },
          { GameInput::TAB_RIGHT_MENU, { InputField::keyboard(SDL_SCANCODE_F17) } }
      };
+ 
+     default_game_input_device_mapping default_n64_mappings_controller = {
++        { GameInput::ACCEPT_INGAME_MENU, { InputField::controller_digital(SDL_CONTROLLER_BUTTON_SOUTH) } },
++        { GameInput::BACK_INGAME_MENU, { InputField::controller_digital(SDL_CONTROLLER_BUTTON_WEST) } },
+         { GameInput::A,              { InputField::controller_digital(SDL_CONTROLLER_BUTTON_SOUTH) } },
+         { GameInput::B,              { InputField::controller_digital(SDL_CONTROLLER_BUTTON_WEST) } },
+         { GameInput::L,              { InputField::controller_digital(SDL_CONTROLLER_BUTTON_LEFTSHOULDER) } },
 diff --git a/recompinput/src/input_state.cpp b/recompinput/src/input_state.cpp
 index 03ed871a60e679e754adaa0bf7a4f281485f4190..802487abc6af989abe3e2ce14c460e406f569a2b 100644
 --- a/recompinput/src/input_state.cpp
@@ -150,18 +160,20 @@ index 03ed871a60e679e754adaa0bf7a4f281485f4190..802487abc6af989abe3e2ce14c460e40
          return false;
      }
 diff --git a/recompinput/src/input_types.cpp b/recompinput/src/input_types.cpp
-index c6786e64047050a062ab95812ad4a23292ee1cc8..774ca1335068c4f9a113a89e1a665cb5bd167da4 100644
+index c6786e64047050a062ab95812ad4a23292ee1cc8..12f8c31583bfe4efb77b036de12de55bc75fb72b 100644
 --- a/recompinput/src/input_types.cpp
 +++ b/recompinput/src/input_types.cpp
-@@ -17,6 +17,7 @@ constexpr std::array<std::string, num_game_inputs> get_default_game_input_descri
+@@ -17,6 +17,9 @@ constexpr std::array<std::string, num_game_inputs> get_default_game_input_descri
      std::array<std::string, num_game_inputs> descriptions = {
          DEFINE_ALL_INPUTS()
      };
++    descriptions[static_cast<size_t>(GameInput::ACCEPT_INGAME_MENU)] = "Accept in the game menus, advance the title screen, or skip logos and the opening intro. When unbound, uses the normal A binding.";
++    descriptions[static_cast<size_t>(GameInput::BACK_INGAME_MENU)] = "Go back in the game menus and pause menu. When unbound, uses the normal B binding.";
 +    descriptions[static_cast<size_t>(GameInput::FAST_FORWARD)] = "Fast-forward at the speed and button mode selected in General. Works in gameplay, menus and cutscenes.";
      descriptions[static_cast<size_t>(GameInput::TOGGLE_MENU)] = "Open or close this configuration menu from in game.";
      descriptions[static_cast<size_t>(GameInput::ACCEPT_MENU)] = "In the recomp interface, performs the action for the currently highlighted item. Like pressing a button, or toggling a switch.";
      descriptions[static_cast<size_t>(GameInput::BACK_MENU)] = "In the recomp interface, returns to the header or backs out to a previous menu.";
-@@ -260,6 +261,15 @@ std::string recompinput::InputField::to_string() const {
+@@ -260,6 +263,15 @@ std::string recompinput::InputField::to_string() const {
          return controller_axis_to_string(input_id);
      case InputType::Keyboard:
          return keyboard_input_to_string((SDL_Scancode)input_id);
@@ -353,23 +365,79 @@ index 6c84c0531464f211705d094afabbf7414b6ac504..31774e1f9c41f3cad713be8053e48fcd
          for (auto &[config_id, config] : configs) {
              if (config_id == id) {
 diff --git a/recompui/src/config/ui_config_page_controls.cpp b/recompui/src/config/ui_config_page_controls.cpp
-index f379a6f11c942e0e44c9f22b686aeed9edce3b8a..29463f598d57fc147ed51db16bd3713fff3b022c 100644
+index f379a6f11c942e0e44c9f22b686aeed9edce3b8a..1279f1097fa5f57359e1ed95551f865d0cd07be9 100644
 --- a/recompui/src/config/ui_config_page_controls.cpp
 +++ b/recompui/src/config/ui_config_page_controls.cpp
-@@ -581,12 +581,7 @@ void ConfigPageControls::update_control_mappings() {
+@@ -189,6 +189,7 @@ ConfigPageControls::~ConfigPageControls() {
+ void ConfigPageControls::create_game_input_contexts() {
+     game_input_sections.n64.contexts.clear();
+     game_input_sections.menu.contexts.clear();
++    game_input_sections.ingame_menu.contexts.clear();
+     game_input_sections.other.clear();
+ 
+     for (int i = 0; i < static_cast<int>(recompinput::GameInput::COUNT); i++) {
+@@ -204,8 +205,12 @@ void ConfigPageControls::create_game_input_contexts() {
+             recompinput::get_game_input_clearable(input)
+         };
+ 
+-        if (recompinput::get_game_input_is_menu(input)) {
+-            game_input_sections.menu.contexts.push_back(input_ctx);
++        if (input == recompinput::GameInput::ACCEPT_INGAME_MENU || input == recompinput::GameInput::BACK_INGAME_MENU) {
++            game_input_sections.ingame_menu.contexts.push_back(input_ctx);
++        } else if (recompinput::get_game_input_is_menu(input)) {
++            if (get_player_input_device() != recompinput::InputDevice::Keyboard) {
++                game_input_sections.menu.contexts.push_back(input_ctx);
++            }
+         } else {
+             game_input_sections.n64.contexts.push_back(input_ctx);
+         }
+@@ -478,7 +483,7 @@ void ConfigPageControls::render_footer() {
+             keyboard_toggle->set_checked(single_player_show_keyboard_mappings);
+             keyboard_toggle->add_checked_callback([this](bool checked) {
+                 this->single_player_show_keyboard_mappings = checked;
+-                this->update_control_mappings();
++                this->force_update();
+             });
+         }
+     }
+@@ -580,14 +585,6 @@ void ConfigPageControls::update_control_mappings() {
+     for (auto *wrapper : rows_wrappers) {
          wrapper->set_margin_top(0.0f);
          wrapper->set_margin_bottom(0.0f);
-         if (wrapper->is_menu) {
+-        if (wrapper->is_menu) {
 -            if (get_player_input_device() == recompinput::InputDevice::Keyboard) {
 -                wrapper->display_hide();
 -            } else {
 -                wrapper->display_show();
 -            }
 -            break;
-+            wrapper->display_show();
-         }
+-        }
      }
  
+     recompui::GameInputRowsWrapper *first = nullptr;
+@@ -673,3 +670,4 @@ void ConfigPageControls::on_option_hover(recompinput::GameInput input_id) {
+ 
+ 
+ } // namespace recompui
++
+diff --git a/recompui/src/config/ui_config_page_controls.h b/recompui/src/config/ui_config_page_controls.h
+index dd8ff242a864a701d482b7fb8c2d7bb59191c918..47d4df046349ef7137d097a82ec01bbb7676810c 100644
+--- a/recompui/src/config/ui_config_page_controls.h
++++ b/recompui/src/config/ui_config_page_controls.h
+@@ -112,11 +112,13 @@ protected:
+     struct {
+         GameInputSection n64 = GameInputSection("");
+         GameInputSection menu = GameInputSection("Menu Inputs");
++        GameInputSection ingame_menu = GameInputSection("In-game Menu");
+         std::vector<GameInputSection> other;
+ 
+         std::vector<GameInputSection *> get_all_sections() {
+             std::vector<GameInputSection *> all_sections = {
+                 &n64,
++                &ingame_menu,
+                 &menu
+             };
+             for (auto &section : other) {
 diff --git a/recompui/src/config/ui_config_page_options_menu.cpp b/recompui/src/config/ui_config_page_options_menu.cpp
 index 6ba64e2a349cc9b5732d6e61e7d4824d4e496867..c9c0a16868440a7f9ba70164b35d9743777efca0 100644
 --- a/recompui/src/config/ui_config_page_options_menu.cpp
