@@ -3,8 +3,8 @@
 
 #include "sssv_patch_ui_domain.h"
 
-// In widescreen the legacy TV-safe inset (8px) collapses to 0; overscan
-// fullscreen/border rects are treated as full-frame draws.
+// Full-screen background/fade rectangles cover the rendered frame in every
+// aspect mode. Expand also collapses TV-safe scissors and border rectangles.
 
 static inline s16 display_policy_frame_width(void) {
     if (ui_is_expand_active()) {

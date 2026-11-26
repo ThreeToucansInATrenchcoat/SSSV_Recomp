@@ -544,11 +544,6 @@ RECOMP_PATCH void func_802B3EC0_6C5570(Gfx** dl, s16 mode, f32 arg2, f32 arg3, f
 
     if ((gGameState.level == 36) && (gCameraVisibilityMask[0] == 0x80)) {
         draw_rectangle(dl, 0, 0, SSSV_BASE_WIDTH, SSSV_BASE_HEIGHT, 255, 255, 255, 255);
-    } else if ((gGameState.level == 36) && (gCameraVisibilityMask[0] == 0x8F) && (mode == 2)) {
-        // The moving Take-Two model can draw outside the TV-safe inset.
-        // Clear those pixels too: Original mode otherwise retains strips of
-        // earlier, larger logo frames around the inset black rectangle.
-        draw_rectangle(dl, 0, 0, SSSV_BASE_WIDTH, SSSV_BASE_HEIGHT, 0, 0, 0, 255);
     } else if (mode == 0) {
         draw_rectangle(dl, 0, 0, SSSV_BASE_WIDTH, SSSV_BASE_HEIGHT, 0, 0, 0, 255);
         func_802B4148_6C57F8(dl);
@@ -575,15 +570,15 @@ RECOMP_PATCH void draw_rectangle(Gfx** dl, s16 x0, s16 y0, s16 x1, s16 y1, u8 r,
     s16 draw_x0 = x0, draw_y0 = y0;
     s16 draw_x1 = x1, draw_y1 = y1;
 
-    if (expanded_widescreen) {
-        if (is_legacy_fullscreen_or_overscan_rect(x0, y0, x1, y1)) {
-            draw_x0 = 0; draw_y0 = 0;
-            draw_x1 = screen_w; draw_y1 = screen_h;
-        }
-        else if ((alpha >= 0xC0) && (r <= 8) && (g <= 8) && (b <= 8) &&
-                 is_legacy_overscan_border_rect(x0, y0, x1, y1)) {
-            return;
-        }
+    // Full-screen clears and fades must cover the whole rendered frame in
+    // Original as well as Expand mode. The N64's eight-pixel TV-safe inset
+    // otherwise leaves old model/star pixels alive outside the cleared area.
+    if (is_legacy_fullscreen_or_overscan_rect(x0, y0, x1, y1)) {
+        draw_x0 = 0; draw_y0 = 0;
+        draw_x1 = screen_w; draw_y1 = screen_h;
+    } else if (expanded_widescreen && (alpha >= 0xC0) && (r <= 8) && (g <= 8) && (b <= 8) &&
+               is_legacy_overscan_border_rect(x0, y0, x1, y1)) {
+        return;
     }
 
     gDPPipeSync((*dl)++);
