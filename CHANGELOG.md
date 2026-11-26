@@ -3,7 +3,7 @@
 ## Build 7.2 — 26 November 2026
 
 - Fixed old pixels lingering around the edges in Original aspect ratio. Full-screen background clears and fades now cover the entire rendered frame across levels and menus, replacing the earlier Take-Two-only workaround.
-- Removed Herobrine.
+- Herobrine removed Scott
 
 ## Build 7.1 — 25 November 2026
 
